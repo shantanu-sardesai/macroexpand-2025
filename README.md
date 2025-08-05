@@ -10,3 +10,13 @@ chmod +x ./bin/*.sh
 ./bin/install_libtorch.sh
 ```
 
+### Run
+
+```sh
+jank \
+    -I"$(pwd)/third-party/pytorch/libtorch_install_cpp20_debug/include" \
+    -I"$(pwd)/third-party/pytorch/libtorch_install_cpp20_debug/include/torch/csrc/api/include" \
+    -L"$(pwd)/third-party/pytorch/libtorch_install_cpp20_debug/lib" \
+    run main.jank
+```
+

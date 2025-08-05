@@ -1,1 +1,47 @@
-(println "Hello, World!")
+(cpp/raw "#include <iostream>")
+(cpp/raw "#include <torch/torch.h>") ;; TODO: is this required?
+
+;; Define a new Module.
+(cpp/raw "
+struct Net : torch::nn::Module {
+  Net() {
+    // Construct and register two Linear submodules.
+    fc1 = register_module(\"fc1\", torch::nn::Linear(784, 64));
+    fc2 = register_module(\"fc2\", torch::nn::Linear(64, 32));
+    fc3 = register_module(\"fc3\", torch::nn::Linear(32, 10));
+  }
+
+  // Implement the Net's algorithm.
+  torch::Tensor forward(torch::Tensor x) {
+    // Use one of many tensor manipulation functions.
+    x = torch::relu(fc1->forward(x.reshape({x.size(0), 784})));
+    x = torch::dropout(x, /*p=*/0.5, /*train=*/is_training());
+    x = torch::relu(fc2->forward(x));
+    x = torch::log_softmax(fc3->forward(x), /*dim=*/1);
+    return x;
+  }
+
+  // Use one of many \"standard library\" modules.
+  torch::nn::Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
+}
+")
+
+(defn train []
+  (let [net (cpp/std.make_shared (cpp/type Net)) ;; TODO: fix empty template call.
+        mnist (cpp/torch.data.datasets.MNIST "./data")
+        dataset (map cpp/torch.data.transforms.Stack mnist)
+        data-loader (cpp/torch.data.make_data_loader dataset 64) ;; Create a multi-threaded data loader for the MNIST dataset.
+        optimizer (cpp/new cpp/torch.optim.SGD (cpp/.parameters net) 0.01)] ;; Instantiate an SGD optimization algorithm to update our Net's parameters.
+    (for [epoch 1
+          :while (<= epoch 1)]
+      (let [batch-index 0]
+        (for [batch data-loader]
+          (cpp/.zero_grad optimizer)
+          (let [prediction (cpp/.forward net (cpp/.-data batch))
+                loss (cpp/torch.nll_loss prediction, (cpp/.-target batch))]
+            (cpp/.backward loss)
+            (cpp/.step optimizer)
+            (if (zero? (rem (inc batch-index) 100))
+              (cpp/<< cpp/std.cout (cpp/cast cpp/std.string (str "Epoch: " epoch " | Batch: " batch-index " | Loss: " (cpp/.item loss (cpp/type cpp/float)) \newline)))
+              (cpp/torch.save net "net.pt"))))))))
+
