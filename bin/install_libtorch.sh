@@ -15,8 +15,7 @@
 set -e
 
 # --- Configuration ---
-USER_ROOT_DIR="/Users/shantanusardesai/Desktop/code/projects"
-PROJECT_ROOT_DIR="${USER_ROOT_DIR}/macroexpand/third-party/pytorch"
+PROJECT_ROOT_DIR="$(pwd)/third-party/pytorch"
 BUILD_CONFIGURATION="Debug"
 EXPECTED_CXX_STANDARD="20" # Can be changed to "17", "20", etc.
 
