@@ -27,21 +27,28 @@ struct Net : torch::nn::Module {
 ")
 
 (defn train []
-  (let [net (cpp/std.make_shared (cpp/type Net)) ;; TODO: fix empty template call.
-        mnist (cpp/torch.data.datasets.MNIST "./data")
-        dataset (map cpp/torch.data.transforms.Stack mnist)
+  (let [net (cpp/std.make_shared (cpp/type Net)) ;; TODO: fix empty template call. Also, missing boxing?
+        mnist (cpp/torch.data.datasets.MNIST "./data") ; TODO missing boxing? https://github.com/pytorch/pytorch/blob/aeb5321b6360c899808d3461789b3bbd6265756e/torch/csrc/api/include/torch/data/datasets/mnist.h#L14
+        dataset (cpp/.map mnist (cpp/torch.data.transforms.Stack))
         data-loader (cpp/torch.data.make_data_loader dataset 64) ;; Create a multi-threaded data loader for the MNIST dataset.
+        ;; TODO: missing boxing?
         optimizer (cpp/new cpp/torch.optim.SGD (cpp/.parameters net) 0.01)] ;; Instantiate an SGD optimization algorithm to update our Net's parameters.
-    (for [epoch 1
-          :while (<= epoch 1)]
-      (let [batch-index 0]
-        (for [batch data-loader]
-          (cpp/.zero_grad optimizer)
-          (let [prediction (cpp/.forward net (cpp/.-data batch))
-                loss (cpp/torch.nll_loss prediction, (cpp/.-target batch))]
-            (cpp/.backward loss)
-            (cpp/.step optimizer)
-            (if (zero? (rem (inc batch-index) 100))
-              (cpp/<< cpp/std.cout (cpp/cast cpp/std.string (str "Epoch: " epoch " | Batch: " batch-index " | Loss: " (cpp/.item loss (cpp/type cpp/float)) \newline)))
-              (cpp/torch.save net "net.pt"))))))))
+    (loop [epoch 1]
+      (when (<= epoch 1)
+        (let [batch-index 0]
+          (for [batch data-loader] ;; TODO: this is certainly incorrect.
+            (cpp/.zero_grad optimizer)
+            (let [prediction (cpp/.forward net (cpp/.-data batch))
+                  loss (cpp/torch.nll_loss prediction (cpp/.-target batch))]
+              (cpp/.backward loss)
+              (cpp/.step optimizer)
+              (if (zero? (rem (inc batch-index) 100))
+                (cpp/<< cpp/std.cout (cpp/cast cpp/std.string (str "Epoch: " epoch
+                                                                   " | Batch: " batch-index
+                                                                   " | Loss: " (cpp/.item loss (cpp/type cpp/float))
+                                                                   \newline)))
+                (cpp/torch.save net "net.pt")))))
+      (recur (inc epoch))))))
+
+(train)
 
