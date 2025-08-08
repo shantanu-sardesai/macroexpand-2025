@@ -23,7 +23,7 @@ EXPECTED_CXX_STANDARD="20" # Can be changed to "17", "20", etc.
 BUILD_CONFIGURATION_LOWER=$(echo "$BUILD_CONFIGURATION" | tr '[:upper:]' '[:lower:]')
 BUILD_DIR="${PROJECT_ROOT_DIR}/build_cpp${EXPECTED_CXX_STANDARD}_${BUILD_CONFIGURATION_LOWER}"
 INSTALL_PATH="${PROJECT_ROOT_DIR}/libtorch_install_cpp${EXPECTED_CXX_STANDARD}_${BUILD_CONFIGURATION_LOWER}"
-TOOLCHAIN_PATH="/opt/homebrew/opt/llvm"
+TOOLCHAIN_PATH="/usr"
 BUILD_TYPE_MESSAGE="C++${EXPECTED_CXX_STANDARD}"
 
 # Set the symbol to check for based on the C++ standard for ABI verification

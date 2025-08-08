@@ -23,13 +23,13 @@ struct Net : torch::nn::Module {
 
   // Use one of many \"standard library\" modules.
   torch::nn::Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
-}
+};
 ")
 
 (defn train []
   (let [net (cpp/std.make_shared (cpp/type Net)) ;; TODO: fix empty template call. Also, missing boxing?
-        mnist (cpp/torch.data.datasets.MNIST "./data") ; TODO missing boxing? https://github.com/pytorch/pytorch/blob/aeb5321b6360c899808d3461789b3bbd6265756e/torch/csrc/api/include/torch/data/datasets/mnist.h#L14
-        dataset (cpp/.map mnist (cpp/torch.data.transforms.Stack))
+        mnist (cpp/box (cpp/new cpp/torch.data.datasets.MNIST "./data")) ; TODO missing boxing? https://github.com/pytorch/pytorch/blob/aeb5321b6360c899808d3461789b3bbd6265756e/torch/csrc/api/include/torch/data/datasets/mnist.h#L14
+        dataset (cpp/.map (cpp/unbox mnist) (cpp/torch.data.transforms.Stack))
         data-loader (cpp/torch.data.make_data_loader dataset 64) ;; Create a multi-threaded data loader for the MNIST dataset.
         ;; TODO: missing boxing?
         optimizer (cpp/new cpp/torch.optim.SGD (cpp/.parameters net) 0.01)] ;; Instantiate an SGD optimization algorithm to update our Net's parameters.
