@@ -5,4 +5,8 @@ data/*
 .DS_Store
 .jank-repl-history
 net.pt
+.clj-kondo
+.lsp
+vim
+.nrepl-port
 

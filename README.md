@@ -31,7 +31,7 @@ Download the sample data for training from [here](https://drive.google.com/drive
 #### Test the setup
 
 ```sh
-make setup-test
+make test-setup
 ```
 
 ## C++ Interop

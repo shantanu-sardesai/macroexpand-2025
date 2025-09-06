@@ -1,5 +1,5 @@
 (cpp/raw "#include <iostream>")
-(cpp/raw "#include <torch/torch.h>") ;; TODO: is this required?
+(cpp/raw "#include <torch/torch.h>")
 
 ;; Define a new Module.
 (cpp/raw "
@@ -26,29 +26,49 @@ struct Net : torch::nn::Module {
 };
 ")
 
+; This is required because the overload resolution for this call in jank C++ interop didn't work.
+(cpp/raw "
+auto map_data(torch::data::datasets::MNIST mnist, torch::data::transforms::Stack<> stack)
+{
+  return mnist.map(stack);
+}
+")
+
+; A very interesting reason as to why it's required, read more here: https://github.com/jank-lang/jank/issues/413.
+(cpp/raw "bool it_neq(auto lhs, auto rhs) { return lhs != rhs; } ")
+
 (defn train []
-  (let [net (cpp/std.make_shared (cpp/type Net)) ;; TODO: fix empty template call. Also, missing boxing?
-        mnist (cpp/box (cpp/new cpp/torch.data.datasets.MNIST "./data")) ; TODO missing boxing? https://github.com/pytorch/pytorch/blob/aeb5321b6360c899808d3461789b3bbd6265756e/torch/csrc/api/include/torch/data/datasets/mnist.h#L14
-        dataset (cpp/.map (cpp/unbox mnist) (cpp/torch.data.transforms.Stack))
-        data-loader (cpp/torch.data.make_data_loader dataset 64) ;; Create a multi-threaded data loader for the MNIST dataset.
-        ;; TODO: missing boxing?
-        optimizer (cpp/new cpp/torch.optim.SGD (cpp/.parameters net) 0.01)] ;; Instantiate an SGD optimization algorithm to update our Net's parameters.
+  (let [net (cpp/value "std::make_shared<Net>()")
+        mnist (cpp/torch.data.datasets.MNIST (cpp/cast cpp/std.string "./data"))
+        stack ((cpp/type "torch::data::transforms::Stack<>"))
+        dataset (cpp/map_data mnist stack)
+        data-loader (cpp/torch.data.make_data_loader dataset (cpp/int 64)) ;; Create a multi-threaded data loader for the MNIST dataset.
+        optimizer (cpp/torch.optim.SGD (cpp/.parameters (cpp/* net)) (cpp/float 0.01)) ;; Instantiate an SGD optimization algorithm to update our Net's parameters.
+        newline (cpp/cast cpp/std.string "\n")]
     (loop [epoch 1]
       (when (<= epoch 1)
-        (let [batch-index 0]
-          (for [batch data-loader] ;; TODO: this is certainly incorrect.
-            (cpp/.zero_grad optimizer)
-            (let [prediction (cpp/.forward net (cpp/.-data batch))
-                  loss (cpp/torch.nll_loss prediction (cpp/.-target batch))]
-              (cpp/.backward loss)
-              (cpp/.step optimizer)
-              (if (zero? (rem (inc batch-index) 100))
-                (cpp/<< cpp/std.cout (cpp/cast cpp/std.string (str "Epoch: " epoch
-                                                                   " | Batch: " batch-index
-                                                                   " | Loss: " (cpp/.item loss (cpp/type cpp/float))
-                                                                   \newline)))
-                (cpp/torch.save net "net.pt")))))
-      (recur (inc epoch))))))
+        (let [batch-index 0
+              it (cpp/.begin (cpp/* data-loader))
+              end (cpp/.end (cpp/* data-loader))]
+          (loop []
+            (when (cpp/it_neq it end)
+              (cpp/.zero_grad optimizer)
+              (let [batch (cpp/* it)
+                    prediction (cpp/.forward (cpp/* net) (cpp/.-data batch))
+                    loss (cpp/torch.nll_loss prediction (cpp/.-target batch))] ; FIXME: Unable to find 'nll_loss' within namespace 'torch'.
+                (cpp/.backward loss)
+                (cpp/.step optimizer)
+                (if (zero? (rem (inc batch-index) 100))
+                  (cpp/<< cpp/std.cout (cpp/cast cpp/std.string (str "Epoch: " epoch
+                                                                     " | Batch: " batch-index
+                                                                     " | Loss: " (cpp/.item loss (cpp/type cpp/float)) ; FIXME: No idea how to pass a explicit type parameter when calling a member function from jank land.
+                                                                     \newline)))
+                  (cpp/torch.save net "net.pt")))
+              (cpp/++ data-loader)
+              (recur))))
+      (recur (inc epoch))))
+    (cpp/<< cpp/std.cout (cpp/cast cpp/std.string "Training complete"))
+    (cpp/<< cpp/std.cout newline)))
 
 (train)
 
