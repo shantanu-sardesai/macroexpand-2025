@@ -27,15 +27,28 @@ struct Net : torch::nn::Module {
 ")
 
 ; This is required because the overload resolution for this call in jank C++ interop didn't work.
+; The return type is following this slack thread: https://clojurians.slack.com/archives/C03SRH97FDK/p1757187767548989?thread_ts=1757169396.120749&cid=C03SRH97FDK
 (cpp/raw "
-auto map_data(torch::data::datasets::MNIST mnist, torch::data::transforms::Stack<> stack)
+inline decltype(auto) map_data(torch::data::datasets::MNIST mnist, torch::data::transforms::Stack<> stack)
 {
   return mnist.map(stack);
+}
+")
+(cpp/raw "
+inline decltype(auto) call_nll_loss(auto prediction, auto batch_target) {
+  return torch::nll_loss(prediction, batch_target);
 }
 ")
 
 ; A very interesting reason as to why it's required, read more here: https://github.com/jank-lang/jank/issues/413.
 (cpp/raw "bool it_neq(auto lhs, auto rhs) { return lhs != rhs; } ")
+
+; Since currently jank doesn't support passing in an explicit type parameter.
+(cpp/raw "
+inline decltype(auto) get_item(auto loss) {
+  // return loss.item<float>();
+  return 100;
+}")
 
 (defn train []
   (let [net (cpp/value "std::make_shared<Net>()")
@@ -55,20 +68,21 @@ auto map_data(torch::data::datasets::MNIST mnist, torch::data::transforms::Stack
               (cpp/.zero_grad optimizer)
               (let [batch (cpp/* it)
                     prediction (cpp/.forward (cpp/* net) (cpp/.-data batch))
-                    loss (cpp/torch.nll_loss prediction (cpp/.-target batch))] ; FIXME: Unable to find 'nll_loss' within namespace 'torch'.
+                    loss (cpp/call_nll_loss prediction (cpp/.-target batch))] 
                 (cpp/.backward loss)
                 (cpp/.step optimizer)
                 (if (zero? (rem (inc batch-index) 100))
-                  (cpp/<< cpp/std.cout (cpp/cast cpp/std.string (str "Epoch: " epoch
-                                                                     " | Batch: " batch-index
-                                                                     " | Loss: " (cpp/.item loss (cpp/type cpp/float)) ; FIXME: No idea how to pass a explicit type parameter when calling a member function from jank land.
-                                                                     \newline)))
-                  (cpp/torch.save net "net.pt")))
-              (cpp/++ data-loader)
+                  ; (cpp/<< cpp/std.cout (cpp/cast cpp/std.string (str "Epoch: " epoch
+                  ;                                                    " | Batch: " batch-index
+                  ;                                                    " | Loss: " (cpp/get_item loss) ; FIXME: No idea how to pass a explicit type parameter when calling a member function from jank land.
+                  ;                                                    \newline)))
+                  (cpp/torch.save net (cpp/cast cpp/std.string "net.pt"))))
+              (cpp/++ it)
               (recur))))
       (recur (inc epoch))))
     (cpp/<< cpp/std.cout (cpp/cast cpp/std.string "Training complete"))
-    (cpp/<< cpp/std.cout newline)))
+    (cpp/<< cpp/std.cout newline))
+  nil)
 
-(train)
+; (train)
 
