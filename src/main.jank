@@ -72,11 +72,12 @@ inline decltype(auto) get_item(auto loss) {
                 (cpp/.backward loss)
                 (cpp/.step optimizer)
                 (if (zero? (rem (inc batch-index) 100))
-                  ; (cpp/<< cpp/std.cout (cpp/cast cpp/std.string (str "Epoch: " epoch
-                  ;                                                    " | Batch: " batch-index
-                  ;                                                    " | Loss: " (cpp/get_item loss) ; FIXME: No idea how to pass a explicit type parameter when calling a member function from jank land.
-                  ;                                                    \newline)))
-                  (cpp/torch.save net (cpp/cast cpp/std.string "net.pt"))))
+                  (do
+                    (cpp/<< cpp/std.cout (cpp/cast cpp/std.string (str "Epoch: " epoch
+                                                                     " | Batch: " batch-index
+                                                                     " | Loss: " (cpp/get_item loss) ; FIXME: No idea how to pass a explicit type parameter when calling a member function from jank land.
+                                                                     \newline)))
+                    (cpp/torch.save net (cpp/cast cpp/std.string "net.pt")))))
               (cpp/++ it)
               (recur))))
       (recur (inc epoch))))
