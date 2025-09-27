@@ -29,7 +29,7 @@ struct Net : torch::nn::Module {
 ; This is required because the overload resolution for this call in jank C++ interop didn't work.
 ; The return type is following this slack thread: https://clojurians.slack.com/archives/C03SRH97FDK/p1757187767548989?thread_ts=1757169396.120749&cid=C03SRH97FDK
 (cpp/raw "
-inline decltype(auto) map_data(torch::data::datasets::MNIST mnist, torch::data::transforms::Stack<> stack)
+inline decltype(auto) map_data(torch::data::datasets::MNIST mnist, torch::data::transforms::Stack<torch::data::Example<>> stack)
 {
   return mnist.map(stack);
 }
@@ -50,46 +50,48 @@ inline decltype(auto) get_item(auto loss) {
   return 100;
 }")
 
-; https://github.com/pytorch/pytorch/blob/5985e28912aeb40b103ebfcf2fd0665eb4a50599/torch/csrc/api/include/torch/data/dataloader.h#L48
+; https://github.com/pytorch/pytorch/blob/908c5cc4c0f22d141776bde47c296b5186691855/torch/csrc/api/include/torch/data/dataloader.h#L31
 (cpp/raw "
-inline decltype(auto) map_data_loader(torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<>> dataset, int batch_size) {
+inline decltype(auto) map_data_loader(torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>> dataset, int batch_size) {
   return torch::data::make_data_loader(dataset, batch_size);
 }
 ")
 
 (defn train []
-  (let [net (cpp/value "std::make_shared<Net>()")
+  (let [net (cpp/box (cpp/& (cpp/value "std::make_shared<Net>()")))
         mnist (cpp/torch.data.datasets.MNIST (cpp/cast cpp/std.string "./data"))
-        stack ((cpp/type "torch::data::transforms::Stack<>"))
+        stack ((cpp/type "torch::data::transforms::Stack<torch::data::Example<>>"))
         dataset (cpp/map_data mnist stack)
-        data-loader (cpp/torch.data.make_data_loader dataset (cpp/int 64)) ;; Create a multi-threaded data loader for the MNIST dataset.
-        optimizer (cpp/torch.optim.SGD (cpp/.parameters (cpp/* net)) (cpp/float 0.01)) ;; Instantiate an SGD optimization algorithm to update our Net's parameters.
+        data-loader (cpp/box (cpp/& (cpp/torch.data.make_data_loader dataset (cpp/size_t 64)))) ;; Create a multi-threaded data loader for the MNIST dataset.
+        optimizer (cpp/box (cpp/& (cpp/torch.optim.SGD (cpp/.parameters (cpp/* (cpp/* (cpp/unbox (cpp/type "std::shared_ptr<Net>*") net)))) (cpp/float 0.01)))) ;; Instantiate an SGD optimization algorithm to update our Net's parameters.
         newline (cpp/cast cpp/std.string "\n")]
     (loop [epoch 1]
       (when (<= epoch 1)
         (let [batch-index 0
-              it (cpp/.begin (cpp/* data-loader))
-              end (cpp/.end (cpp/* data-loader))]
+              it (cpp/box (cpp/& (cpp/.begin (cpp/.get (cpp/unbox (cpp/type "std::enable_if_t<!torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>::is_stateful && std::is_constructible_v<torch::data::samplers::RandomSampler, size_t>, std::unique_ptr<torch::data::StatelessDataLoader<torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>, torch::data::samplers::RandomSampler>>>*") data-loader)))))
+              end (cpp/box (cpp/& (cpp/.end (cpp/.get (cpp/unbox (cpp/type "std::enable_if_t<!torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>::is_stateful && std::is_constructible_v<torch::data::samplers::RandomSampler, size_t>, std::unique_ptr<torch::data::StatelessDataLoader<torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>, torch::data::samplers::RandomSampler>>>*") data-loader)))))]
           (loop []
-            (when (cpp/it_neq it end)
-              (cpp/.zero_grad optimizer)
-              (let [batch (cpp/* it)
-                    prediction (cpp/.forward (cpp/* net) (cpp/.-data batch))
+            (when (cpp/it_neq (cpp/unbox (cpp/type "torch::data::Iterator<torch::data::Example<at::Tensor, at::Tensor>>*") it) (cpp/unbox (cpp/type "torch::data::Iterator<torch::data::Example<at::Tensor, at::Tensor>>*") end))
+              (cpp/.zero_grad (cpp/unbox cpp/torch.optim.SGD* optimizer))
+              (let [batch (cpp/* (cpp/* (cpp/unbox (cpp/type "torch::data::Iterator<torch::data::Example<at::Tensor, at::Tensor>>*") it)))
+                    prediction (cpp/.forward (cpp/* (cpp/* (cpp/unbox (cpp/type "std::shared_ptr<Net>*") net))) (cpp/.-data batch))
                     loss (cpp/call_nll_loss prediction (cpp/.-target batch))] 
                 (cpp/.backward loss)
-                (cpp/.step optimizer)
+                (cpp/.step (cpp/unbox cpp/torch.optim.SGD* optimizer))
                 (if (zero? (rem (inc batch-index) 100))
                   (do
                     (cpp/<< cpp/std.cout (cpp/cast cpp/std.string (str "Epoch: " epoch
                                                                      " | Batch: " batch-index
                                                                      " | Loss: " (cpp/get_item loss) ; FIXME: No idea how to pass a explicit type parameter when calling a member function from jank land.
                                                                      \newline)))
-                    (cpp/torch.save net (cpp/cast cpp/std.string "net.pt")))))
+                    (cpp/torch.save (cpp/* (cpp/unbox (cpp/type "std::shared_ptr<Net>*") net)) (cpp/cast cpp/std.string "net.pt"))
+                    nil)))
               (cpp/++ it)
               (recur))))
         (recur (inc epoch))))
     (cpp/<< cpp/std.cout (cpp/cast cpp/std.string "Training complete"))
-    (cpp/<< cpp/std.cout newline))
+    (cpp/<< cpp/std.cout newline)
+    nil)
   nil)
 
 (train)
