@@ -28,6 +28,13 @@ struct Net : torch::nn::Module {
 
 ; This is required because the overload resolution for this call in jank C++ interop didn't work.
 ; The return type is following this slack thread: https://clojurians.slack.com/archives/C03SRH97FDK/p1757187767548989?thread_ts=1757169396.120749&cid=C03SRH97FDK
+(comment
+  :fixme
+  "
+  ─ analyze/invalid-cpp-call ─────────────────────────────────────────────────────────────────────────
+    error: No matching call to 'map' function. With argument 0 having type 'torch::data::datasets::MNIST
+           &'. With argument 1 having type 'torch::data::transforms::Stack<torch::data::Example<> > &'.
+  ")
 (cpp/raw "
 inline decltype(auto) map_data(torch::data::datasets::MNIST mnist, torch::data::transforms::Stack<torch::data::Example<>> stack)
 {
@@ -35,25 +42,54 @@ inline decltype(auto) map_data(torch::data::datasets::MNIST mnist, torch::data::
 }
 ")
 
+(comment
+  :fixme
+  "
+  ─ analyze/unresolved-cpp-symbol ────────────────────────────────────────────────────────────────────
+    error: Unable to find 'nll_loss' within namespace 'torch'.
+  ")
 (cpp/raw "
 inline decltype(auto) call_nll_loss(auto prediction, auto batch_target) {
   return torch::nll_loss(prediction, batch_target);
 }
 ")
 
-; A very interesting reason as to why it's required, read more here: https://github.com/jank-lang/jank/issues/413.
+(comment
+  :fixme
+  "
+  https://github.com/jank-lang/jank/issues/413
+  ")
 (cpp/raw "
 bool it_neq(auto lhs, auto rhs) { return lhs != rhs; }
 ")
 
-; Since currently jank doesn't support passing in an explicit type parameter.
+(comment
+  :info
+  "Since currently jank doesn't support passing in an explicit type parameter."
+
+  :fixme
+  "
+  In file included from <<< inputs >>>:1:
+  input_line_8:3:15: error: use 'template' keyword to treat 'item' as a dependent template name
+    3 |   return loss.item<float>();
+      |               ^
+      |               template
+  Uncaught exception: Unable to parse 'cpp/raw' expression.
+  ")
 (cpp/raw "
 inline decltype(auto) get_item(auto loss) {
-  return loss.item<float>();
+  // return loss.item<float>();
+  return 0;
 }
 ")
 
-; https://github.com/pytorch/pytorch/blob/908c5cc4c0f22d141776bde47c296b5186691855/torch/csrc/api/include/torch/data/dataloader.h#L31
+(comment
+  :info
+  "https://github.com/pytorch/pytorch/blob/908c5cc4c0f22d141776bde47c296b5186691855/torch/csrc/api/include/torch/data/dataloader.h#L31"
+
+  :fixme
+  "CppInterOp codegen bug."
+  )
 (cpp/raw "
 inline decltype(auto) make_data_loader(torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>> dataset, std::size_t batch_size) {
   return torch::data::make_data_loader(dataset, batch_size);
@@ -65,7 +101,7 @@ inline decltype(auto) make_data_loader(torch::data::datasets::MapDataset<torch::
         net' (cpp/box (cpp/& net))
         mnist (cpp/torch.data.datasets.MNIST (cpp/cast cpp/std.string "./data"))
         stack ((cpp/type "torch::data::transforms::Stack<torch::data::Example<>>"))
-        dataset (cpp/.map mnist stack)
+        dataset (cpp/map_data mnist stack)
         data-loader (cpp/make_data_loader dataset (cpp/size_t 64)) ;; Create a multi-threaded data loader for the MNIST dataset.
         data-loader' (cpp/box (cpp/& data-loader)) ;; Create a multi-threaded data loader for the MNIST dataset.
         optimizer (-> (cpp/* net) cpp/.parameters (cpp/torch.optim.SGD (cpp/double 0.01)))
