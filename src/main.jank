@@ -91,7 +91,7 @@ inline decltype(auto) make_data_loader(torch::data::datasets::MapDataset<torch::
         stack ((cpp/type "torch::data::transforms::Stack<torch::data::Example<>>"))
         dataset (cpp/map_data mnist stack)
         data-loader (cpp/make_data_loader dataset (cpp/size_t 64)) ;; Create a multi-threaded data loader for the MNIST dataset.
-        optimizer (-> (cpp/* net) cpp/.parameters (cpp/torch.optim.SGD (cpp/double 0.01)))
+        optimizer (-> net cpp/* cpp/.parameters (cpp/torch.optim.SGD (cpp/double 0.01)))
         newline (cpp/cast cpp/std.string "\n")
         ; INFO: We need to box these variables currently since loops are implemented in terms
         ;       of function recursion.
@@ -101,13 +101,19 @@ inline decltype(auto) make_data_loader(torch::data::datasets::MapDataset<torch::
        ]
     (dotimes [epoch 1]
       (let [batch-index 0
-            data-loader (cpp/unbox (cpp/type "std::enable_if_t<!torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>::is_stateful && std::is_constructible_v<torch::data::samplers::RandomSampler, size_t>, std::unique_ptr<torch::data::StatelessDataLoader<torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>, torch::data::samplers::RandomSampler>>>*") data-loader')
-            it (-> data-loader cpp/.get cpp/.begin)
-            end (-> data-loader cpp/.get cpp/.end)]
+            data-loader (cpp/* (cpp/unbox (cpp/type "std::enable_if_t<!torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>::is_stateful && std::is_constructible_v<torch::data::samplers::RandomSampler, size_t>, std::unique_ptr<torch::data::StatelessDataLoader<torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>, torch::data::samplers::RandomSampler>>>*") data-loader'))
+            it (-> data-loader cpp/* cpp/.begin)
+            end (-> data-loader cpp/* cpp/.end)
+            ; INFO: We need to box these variables currently since loops are implemented in terms
+            ;       of function recursion.
+            it' (cpp/box (cpp/& it))
+            end' (cpp/box (cpp/& end))]
         ; INFO: Operator re-write by the C++ compiler: https://github.com/jank-lang/jank/issues/413
-        (when (cpp/! (cpp/== it end))
+        (while (cpp/! (cpp/== (cpp/* (cpp/unbox (cpp/type "torch::data::Iterator<torch::data::Example<>>*") it'))
+                              (cpp/* (cpp/unbox (cpp/type "torch::data::Iterator<torch::data::Example<>>*") end'))))
           (cpp/.zero_grad (cpp/unbox cpp/torch.optim.SGD* optimizer'))
-          (let [batch (cpp/* it)
+          (let [it (cpp/unbox (cpp/type "torch::data::Iterator<torch::data::Example<>>*") it')
+                batch (-> it cpp/* cpp/*)
                 net (cpp/unbox (cpp/type "std::shared_ptr<Net>*") net')
                 prediction (cpp/.forward (-> net cpp/* cpp/*) (cpp/.-data batch))
                 loss (cpp/call_nll_loss prediction (cpp/.-target batch))
@@ -121,9 +127,8 @@ inline decltype(auto) make_data_loader(torch::data::datasets::MapDataset<torch::
                                                                 " | Batch: " batch-index
                                                                 " | Loss: " (cpp/get_item loss) 
                                                                 \newline)))
-                (cpp/torch.save (cpp/* net) (cpp/cast cpp/std.string "net.pt")))))
-          (cpp/++ it)
-          nil)))
+                (cpp/torch.save (cpp/* net) (cpp/cast cpp/std.string "net.pt"))))
+            (cpp/++ it)))))
     (cpp/<< cpp/std.cout (cpp/cast cpp/std.string "Training complete"))
     (cpp/<< cpp/std.cout newline)
     nil))
