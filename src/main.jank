@@ -62,31 +62,12 @@ inline decltype(auto) call_nll_loss(auto prediction, auto batch_target) {
 ")
 
 (comment
-  :fixme
-  "
-  https://github.com/jank-lang/jank/issues/413
-  ")
-(cpp/raw "
-bool it_neq(auto lhs, auto rhs) { return lhs != rhs; }
-")
-
-(comment
   :info
   "Since currently jank doesn't support passing in an explicit type parameter."
-
-  :fixme
-  "
-  In file included from <<< inputs >>>:1:
-  input_line_8:3:15: error: use 'template' keyword to treat 'item' as a dependent template name
-    3 |   return loss.item<float>();
-      |               ^
-      |               template
-  Uncaught exception: Unable to parse 'cpp/raw' expression.
-  ")
+  )
 (cpp/raw "
 inline decltype(auto) get_item(auto loss) {
-  // return loss.item<float>();
-  return 0;
+  return loss.template item<float>();
 }
 ")
 
@@ -122,16 +103,11 @@ inline decltype(auto) make_data_loader(torch::data::datasets::MapDataset<torch::
       (let [batch-index 0
             data-loader (cpp/unbox (cpp/type "std::enable_if_t<!torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>::is_stateful && std::is_constructible_v<torch::data::samplers::RandomSampler, size_t>, std::unique_ptr<torch::data::StatelessDataLoader<torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>, torch::data::samplers::RandomSampler>>>*") data-loader')
             it (-> data-loader cpp/.get cpp/.begin)
-            end (-> data-loader cpp/.get cpp/.end)
-            ; INFO: We need to box these variables currently since loops are implemented in terms
-            ;       of function recursion.
-            it' (cpp/box (cpp/& it))
-            end' (cpp/box (cpp/& end))]
-        (when (cpp/it_neq (cpp/unbox (cpp/type "torch::data::Iterator<torch::data::Example<>>*") it')
-                          (cpp/unbox (cpp/type "torch::data::Iterator<torch::data::Example<>>*") end'))
+            end (-> data-loader cpp/.get cpp/.end)]
+        ; INFO: Operator re-write by the C++ compiler: https://github.com/jank-lang/jank/issues/413
+        (when (cpp/! (cpp/== it end))
           (cpp/.zero_grad (cpp/unbox cpp/torch.optim.SGD* optimizer'))
-          (let [it (cpp/unbox (cpp/type "torch::data::Iterator<torch::data::Example<>>*") it')
-                batch (-> it cpp/* cpp/*)
+          (let [batch (cpp/* it)
                 net (cpp/unbox (cpp/type "std::shared_ptr<Net>*") net')
                 prediction (cpp/.forward (-> net cpp/* cpp/*) (cpp/.-data batch))
                 loss (cpp/call_nll_loss prediction (cpp/.-target batch))
