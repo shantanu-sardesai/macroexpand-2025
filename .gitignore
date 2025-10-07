@@ -1,5 +1,6 @@
 data/*
 !data/.gitkeep
+bench/python/data
 
 # miscellaneous
 .DS_Store
@@ -9,4 +10,13 @@ net.pt
 .lsp
 vim
 .nrepl-port
+
+third-party
+
+*.llvm
+out
+build
+.cpcache
+.vscode
+target
 
