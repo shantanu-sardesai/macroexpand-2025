@@ -12,6 +12,8 @@ git submodule update --recursive --init && chmod +x ./bin/*.sh
 
 ### PyTorch
 
+> Currently the build setup only works for MacOS.
+
 Setup pytorch by running the following commands:
 
 ```sh
