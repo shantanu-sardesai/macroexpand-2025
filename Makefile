@@ -2,7 +2,8 @@ PYTORCH_INSTALL_DIR=$(shell pwd)/third-party/pytorch/libtorch_install_cpp20_debu
 PYTORCH_FLAGS=-I"${PYTORCH_INSTALL_DIR}/include" -I"${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include" -l"${PYTORCH_INSTALL_DIR}/lib/libtorch.dylib"
 
 debug:
-	lldb -- jank ${PYTORCH_FLAGS} 
+	lldb -- jank ${PYTORCH_FLAGS}
+
 repl:
 	jank ${PYTORCH_FLAGS} repl
 
