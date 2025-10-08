@@ -14,7 +14,7 @@ test:
 	jank ${PYTORCH_FLAGS} run ${TEST_FILE}
 
 test-setup:
-	jank ${PYTORCH_FLAGS}	run test/pytorch-setup.jank
+	jank ${PYTORCH_FLAGS} run test/pytorch-setup.jank
 
 .PHONY: repl run test test-setup
 
