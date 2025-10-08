@@ -16,5 +16,5 @@ test:
 test-setup:
 	jank ${PYTORCH_FLAGS}	run test/pytorch-setup.jank
 
-.PHONY: repl run test setup-test
+.PHONY: repl run test test-setup
 
