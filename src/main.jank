@@ -87,43 +87,24 @@ inline decltype(auto) make_data_loader(torch::data::datasets::MapDataset<torch::
 
 (cpp/raw "using TorchStack = torch::data::transforms::Stack<torch::data::Example<>>;")
 
-(cpp/raw "using TorchIterator = torch::data::Iterator<torch::data::Example<>>*;")
-
-(cpp/raw "using TorchDataSet = std::enable_if_t<!torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>::is_stateful && std::is_constructible_v<torch::data::samplers::RandomSampler, size_t>, std::unique_ptr<torch::data::StatelessDataLoader<torch::data::datasets::MapDataset<torch::data::datasets::MNIST, torch::data::transforms::Stack<torch::data::Example<>>>, torch::data::samplers::RandomSampler>>>*;")
-
 (defn train []
   (let [net (cpp/value "std::make_shared<Net>()")
         mnist (cpp/torch.data.datasets.MNIST (cpp/cast cpp/std.string "./data"))
         stack ((cpp/type "TorchStack"))
         dataset (cpp/map_data mnist stack)
         data-loader (cpp/make_data_loader dataset (cpp/size_t 64)) ;; Create a multi-threaded data loader for the MNIST dataset.
-        optimizer (-> net cpp/* cpp/.parameters (cpp/torch.optim.SGD (cpp/double 0.01)))
-        newline (cpp/cast cpp/std.string "\n")
-        ; INFO: We need to box these variables currently since loops are implemented in terms
-        ;       of function recursion.
-        net' (cpp/box (cpp/& net))
-        data-loader' (cpp/box (cpp/& data-loader)) ;; Create a multi-threaded data loader for the MNIST dataset.
-        optimizer' (cpp/box (cpp/& optimizer)) ;; Instantiate an SGD optimization algorithm to update our Net's parameters.
-       ]
+        optimizer (-> net cpp/* cpp/.parameters (cpp/torch.optim.SGD (cpp/double 0.01))) ;; Instantiate an SGD optimization algorithm to update our Net's parameters.
+        newline (cpp/cast cpp/std.string "\n")]
     (dotimes [epoch 1]
-      (let [data-loader (cpp/* (cpp/unbox (cpp/type "TorchDataSet") data-loader'))
-            it (-> data-loader cpp/* cpp/.begin)
-            end (-> data-loader cpp/* cpp/.end)
-            ; INFO: We need to box these variables currently since loops are implemented in terms
-            ;       of function recursion.
-            it' (cpp/box (cpp/& it))
-            end' (cpp/box (cpp/& end))]
-        ; INFO: Operator re-write by the C++ compiler: https://github.com/jank-lang/jank/issues/413
+      (let [it (-> data-loader cpp/* cpp/.begin)
+            end (-> data-loader cpp/* cpp/.end)]
         (loop [batch-index 0]
-          (when (cpp/! (cpp/== (cpp/* (cpp/unbox (cpp/type "TorchIterator") it'))
-                               (cpp/* (cpp/unbox (cpp/type "TorchIterator") end'))))
-            (cpp/.zero_grad (cpp/unbox cpp/torch.optim.SGD* optimizer'))
-            (let [it (cpp/unbox (cpp/type "TorchIterator") it')
-                  batch (-> it cpp/* cpp/*)
-                  net (cpp/unbox (cpp/type "std::shared_ptr<Net>*") net')
-                  prediction (cpp/.forward (-> net cpp/* cpp/*) (cpp/.-data batch))
-                  loss (cpp/call_nll_loss prediction (cpp/.-target batch))
-                  optimizer (cpp/unbox cpp/torch.optim.SGD* optimizer')]
+          ; INFO: Operator re-write by the C++ compiler: https://github.com/jank-lang/jank/issues/413
+          (when (cpp/! (cpp/== it end))
+            (cpp/.zero_grad optimizer)
+            (let [batch (cpp/* it)
+                  prediction (cpp/.forward (cpp/* net) (cpp/.-data batch))
+                  loss (cpp/call_nll_loss prediction (cpp/.-target batch))]
               (cpp/.backward loss)
               (cpp/.step optimizer)
               (when (-> batch-index (rem 100) zero?)
@@ -132,8 +113,8 @@ inline decltype(auto) make_data_loader(torch::data::datasets::MapDataset<torch::
                                                                 " | Batch: " batch-index
                                                                 " | Loss: " (cpp/get_item loss) 
                                                                 \newline)))
-                (cpp/torch.save (cpp/* net) (cpp/cast cpp/std.string "net.pt")))
-                (cpp/++ (cpp/* it))
+                (cpp/torch.save net (cpp/cast cpp/std.string "net.pt")))
+                (cpp/++ it)
                 (recur (inc batch-index)))))))
     (cpp/<< cpp/std.cout (cpp/cast cpp/std.string "Training complete"))
     (cpp/<< cpp/std.cout newline)
