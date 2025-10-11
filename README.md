@@ -13,6 +13,18 @@ git submodule update --recursive --init && chmod +x ./bin/*.sh
 ### PyTorch
 
 > Currently the build setup only works for MacOS.
+>
+> To get libtorch on other OS's you can get it directly from the [PyTorch website](https://pytorch.org/get-started/locally/) by selecting the following options:
+>
+> 1. PyTorch Build: Stable.
+> 2. Your OS.
+> 3. Package: LibTorch.
+> 4. Language: C++.
+> 5. Compute platform: Default (Auto-selected).
+>
+> And then running the command displayed on their site.
+>
+> NOTE: If you get libtorch from their site instead of building it locally the `Makefile` variables will need to be updated to point to the new installation.
 
 Setup pytorch by running the following commands:
 
