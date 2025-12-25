@@ -62,3 +62,8 @@ make run
 make repl
 ```
 
+## Quick links
+
+- [Live presentation](https://www.youtube.com/live/1DKa3-vyPsw?si=Apojxu3Yc6RNgB3-&t=28943).
+- [Slide deck](https://docs.google.com/presentation/d/1wsmXcY9elz67l731a0Lne10q37SiBTChc-EqQdAqvjY/edit?usp=sharing).
+
