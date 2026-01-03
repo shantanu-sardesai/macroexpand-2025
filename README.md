@@ -7,7 +7,7 @@ This repo is a reproduction of [Jianling](https://github.com/jianlingzhong)'s [i
 Clone the project and fetch all the git submodules.
 
 ```sh
-git submodule update --recursive --init && chmod +x ./bin/*.sh
+git submodule update --recursive --init
 ```
 
 ### PyTorch
